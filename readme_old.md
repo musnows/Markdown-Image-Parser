@@ -1,8 +1,9 @@
 ## 背景
+前阵子简书好像说是凉了，搞得我有点小慌，毕竟我的大部分博客都是放在简书上面的，虽然简书提供了打包导出功能，但是只能导出文字，图片的话还是存在简书服务器上面，再加上我一直想要重新做一个个人博客，于是就有了这篇文章。
 
-本项目主要用于解析markdown文件中的图片链接，并将图片下载到本地。方便进行图床迁移
+新版已经支持下载图片到本地并且对markdown内的图片链接进行替换
 
-原作者的博客：[如何导出简书中的全部文章（包括图片）？](https://zhuanlan.zhihu.com/p/121155268)
+参考我的博客：[如何导出简书中的全部文章（包括图片）？](https://zhuanlan.zhihu.com/p/121155268)
 
 ## 思路
 首先是要解析markdown文档，然后获取到其中的所有图片，再把图片按md文件分好目录保存。
@@ -67,15 +68,19 @@ def download_pics(url, file):
         f.buffer.write(img_data)
 ```
 
+### 完整代码
+本项目的完整代码已经上传到GitHub了，地址如下：
+[https://github.com/Deali-Axy/Markdown-Image-Parser](https://github.com/Deali-Axy/Markdown-Image-Parser)
+
 ### 运行
-
-在当前路径创建 `files`文件夹，并在`files`文件夹下创建img目录；将md文件放入`files`文件夹
-
 ```
 pip install -r requirements.txt
 python spider.py
 ```
 
 ## 欢迎与我交流
-
-- [慕雪的寒舍](https://blog.musnow.top)
+- 打代码直播间：[https://live.bilibili.com/11883038](https://live.bilibili.com/11883038)
+- 微信公众号：DealiAxy
+- 知乎：[https://www.zhihu.com/people/dealiaxy](https://www.zhihu.com/people/dealiaxy)
+- 博客：[https://blog.deali.cn](https://blog.deali.cn)
+- 简书：[https://www.jianshu.com/u/965b95853b9f](https://www.jianshu.com/u/965b95853b9f)
