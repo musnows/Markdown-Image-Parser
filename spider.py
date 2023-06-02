@@ -7,8 +7,10 @@ from bs4 import BeautifulSoup
 import time
 import traceback
 
-assert_dir = 'img' # 本地图片存放目录
-targer_dir ='./files/img/' # 存放下载好的本地图片的目录
+TARGET_DIR ='./files/img/' 
+"""存放下载好的本地图片的目录"""
+MD_FILES_DIR = './files'
+"""存放md文件的文件夹 """
 
 
 def open_file(path):
@@ -27,8 +29,8 @@ def write_file(path: str, value):
 def get_files_list(dir):
     """
     获取一个目录下所有文件列表，包括子目录
-    :param dir:
-    :return:
+    :param dir: 文件路径
+    :return: 文件列表
     """
     files_list = []
     for root, dirs, files in os.walk(dir, topdown=False):
@@ -41,8 +43,8 @@ def get_files_list(dir):
 def get_pics_list(md_content):
     """
     获取一个markdown文档里的所有图片链接
-    :param md_content:
-    :return:
+    :param md_content: open的md文件
+    :return: 图片列表
     """
     md_render = misaka.Markdown(misaka.HtmlRenderer())
     html = md_render(md_content)
@@ -62,17 +64,18 @@ def download_pics(url):
     filename = url[url.rfind('/')+1:] # 源文件名
     print('图片文件名：',filename)
     # 如果目标文件目录不存在，创建文件目录
-    if not os.path.exists(targer_dir):
-        os.mkdir(targer_dir)
+    if not os.path.exists(TARGET_DIR):
+        os.mkdir(TARGET_DIR)
     
     # 保存本地（用文件名命名，原作者用的是uuid随机命名）
-    with open(os.path.join(targer_dir, filename), 'w+') as f:
+    with open(os.path.join(TARGET_DIR, filename), 'w+') as f:
         f.buffer.write(img_data)
     
 
 
 if __name__ == '__main__':
-    files_list = get_files_list(os.path.abspath(os.path.join('.', 'files')))
+    # 获取MD_FILES_DIR路径下的所有md文件列表
+    files_list = get_files_list(os.path.abspath(os.path.join('.', MD_FILES_DIR)))
 
     for file in files_list:
         print(f'正在处理：{file}')
