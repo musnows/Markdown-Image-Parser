@@ -77,13 +77,15 @@ def download_pics(url):
         print('不处理本地图片: ', url)
         return
     img_data = requests.get(url).content # 获取到的图片url
-    filename = url[url.rfind('/')+1:] # 源文件名
+    filename = url[url.rfind('/')+1:] # 图片源文件名
     print('图片文件名：',filename)
     # 如果目标文件目录不存在，创建文件目录
     if not os.path.exists(TARGET_DIR):
         os.mkdir(TARGET_DIR)
     
-    # 保存本地（用文件名命名，原作者用的是uuid随机命名）
+    # 保存本地，用图片文件名命名
+    # 原作者用的是uuid随机命名，其实这样更好，但是：前提得替换md文件中的图片链接
+    # 可原作者并没有写这部分的代码，本人对本项目用到的模块并不了解，所以没有进行此功能开发
     with open(os.path.join(TARGET_DIR, filename), 'w+') as f:
         f.buffer.write(img_data)
     
