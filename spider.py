@@ -1,9 +1,10 @@
 import misaka
 import os
 import requests
-import uuid
 import json
 from bs4 import BeautifulSoup
+from datetime import datetime
+from zoneinfo import ZoneInfo # python 3.9+
 import time
 import traceback
 
@@ -14,16 +15,31 @@ MD_FILES_DIR = './files'
 
 
 def open_file(path):
+    """打开json文件"""
     with open(path, 'r', encoding='utf-8') as f:
         tmp = json.load(f)
     return tmp
 
-err_img = open_file('err.json')
-
 def write_file(path: str, value):
+    """写入json文件"""
     with open(path, 'w', encoding='utf-8') as fw2:
         json.dump(value, fw2, indent=2, sort_keys=True, ensure_ascii=False)
 
+def get_time(format_str='%y-%m-%d-%H%M%S'):
+    """获取当前时间，格式为 `23-01-01-000000`"""
+    a = datetime.now(ZoneInfo('Asia/Shanghai'))  # 返回北京时间
+    return a.strftime(format_str)
+
+err_img = {}
+"""保存错误的图片dict"""
+ERR_FILE_PATH = f"{get_time()}-err.json"
+"""保存错误图片的路径"""
+
+def write_err_file():
+    """写入日志文件"""
+    print(f"\n[file] err_img\n{err_img}") # 保存之前打印，避免保存失败
+    write_file(ERR_FILE_PATH,err_img) # 写入文件
+    print(f"[file] write file | {ERR_FILE_PATH}") # 写入成功
 
 
 def get_files_list(dir):
@@ -74,37 +90,42 @@ def download_pics(url):
 
 
 if __name__ == '__main__':
+    print("开始处理\n")
     # 获取MD_FILES_DIR路径下的所有md文件列表
     files_list = get_files_list(os.path.abspath(os.path.join('.', MD_FILES_DIR)))
 
     for file in files_list:
         print(f'正在处理：{file}')
-        # utf-8会有编码报错
+        # utf-8会有编码报错。所以使用如下编码
         with open(file, encoding='ISO-8859-1') as f:
             md_content = f.read()
-
+        # 获取图片列表
         pics_list = get_pics_list(md_content)
         print(f'发现图片 {len(pics_list)} 张')
 
+        md_file_name = "" # 初始化为空
         for index, pic in enumerate(pics_list):
             try:
                 print(f'正在下载第 {index + 1} 张图片...')
-                MDfilename = os.path.basename(file) # 当前处理的md文件的名字
+                md_file_name = os.path.basename(file) # 当前处理的md文件的名字
+                # 处理图片
                 download_pics(pic)
-                time.sleep(0.5) # 避免下载超速
+                time.sleep(0.3) # 避免下载超速
             except KeyboardInterrupt:
+                write_err_file() # 写入日志文件
                 os.abort() # 避免无法ctrl+c
             except:
                 print(traceback.format_exc()) # 打印错误
                 # 判断err_img，如果文件名不在里面，则新增键值
-                if MDfilename not in err_img:
-                    err_img[MDfilename]=[]
+                if md_file_name not in err_img:
+                    err_img[md_file_name]=[]
                 # 添加err图片
-                err_img[MDfilename].append(pic)
+                err_img[md_file_name].append(pic)
                 print("图片获取错误：",pic)
                 time.sleep(1)
+        # 处理完毕单个文件
+        print(f'处理完毕：{file}\n')
     
     # 结束后保存err
-    print(f'处理完成。')
-    write_file('err.json',err_img)
-    print(f'写入err完成')
+    print('\n全部处理完成。')
+    write_err_file()
