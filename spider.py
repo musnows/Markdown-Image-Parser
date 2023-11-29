@@ -51,6 +51,9 @@ def handler_network_pics(url: str, file_path: str):
     return (img_file_path,file_name)
 
 
+FindFileList = []
+"""如果配置了本地路径查询，则会初始化这个变量"""
+
 def handler_local_pics(url: str, file_path: str,md_file_path:str):
     """
     将本地图片也进行移动
@@ -66,12 +69,30 @@ def handler_local_pics(url: str, file_path: str,md_file_path:str):
         base_md_file_path = os.path.dirname(md_file_path)
         file_abs_path = os.path.abspath(os.path.join(base_md_file_path,file_abs_path))
     # 现在一定是绝对路径了
-    _log.info(f'[local] {url} 图片绝对路径处理后：{file_abs_path}')
+    file_name = os.path.basename(file_abs_path)
+    _log.info(f'[local] {url} 图片绝对路径：{file_abs_path} | 文件名：{file_name}')
     if not os.path.exists(file_abs_path):
         _log.error(f'[local] {url} 图片路径没有对应文件：{file_abs_path}')
-        return ("","")
+        if config.LOCAL_IMG_FIND_PATH != "":
+            global FindFileList
+            if not FindFileList:
+                FindFileList = Files.get_files_list(config.LOCAL_IMG_FIND_PATH)
+            # 开始查文件
+            target_file_is_find = False
+            for file in FindFileList:
+                if file_name in os.path.basename(file):
+                    file_abs_path = file
+                    target_file_is_find = True
+                    _log.info(f'[local] {url} 已在 {config.LOCAL_IMG_FIND_PATH} 中找到了文件 {target_file_is_find}')
+                    break
+
+            if not target_file_is_find:
+                _log.error(f'[local] {url} 未在 {config.LOCAL_IMG_FIND_PATH} 中找到')
+                return ("","")
+        else:
+            return ("","")
+
     # 根据策略，将文件cp到目标位置
-    file_name = os.path.basename(file_abs_path)
     img_file_path = os.path.join(file_path, file_name)
     Files.copy_file(file_abs_path,img_file_path)
     _log.info(f'[local] {url} 图片拷贝：{img_file_path} | 文件名：{file_name}')
