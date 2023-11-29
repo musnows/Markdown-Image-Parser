@@ -59,17 +59,18 @@ def get_files_list(dir: str):
     return files_list
 
 
-def add_err_pic(file_name: str, img_url: str):
+def add_err_pic(file_name: str, img_url: str,err_info:str = "None"):
     """
     添加处理错误的图片
     :param file_name 对应的md文件
     :param img_url 图片url链接
+    :param err_info 错误原因
     """
     global ErrImgDict,ErrImgCount
     if file_name not in ErrImgDict:
         ErrImgDict[file_name] = []
     # 插入图片
-    ErrImgDict[file_name].append(img_url)
+    ErrImgDict[file_name][img_url] = err_info
     ErrImgCount += 1
     _log.error(f"[file] add err img '{img_url}' with file '{file_name}'")
 

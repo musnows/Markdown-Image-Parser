@@ -136,7 +136,7 @@ if __name__ == '__main__':
                     # 处理图片，包括下载或者将图片移动到本地
                     new_img_file_path,new_img_file_name = handler_pics(file,pic)
                     if new_img_file_name == "" or new_img_file_path == "":
-                        Files.add_err_pic(file, pic)  # 添加错误图片
+                        Files.add_err_pic(file, pic,"图片处理失败")  # 添加错误图片
                         _log.error(f'[run] {file} 图片处理出错，返回值为空，图片链接：{pic}')
                         continue
                     # 不为空说明处理成功
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                     os.abort()  # 避免无法ctrl+c终止
                 except Exception as result:
                     _log.exception(f"[run] {file} 出现未知处理错误！pic:{pic}")
-                    Files.add_err_pic(file, pic)  # 添加错误图片
+                    Files.add_err_pic(file, pic,f"图片处理出现异常 {str(result)}")  # 添加错误图片
                     time.sleep(0.6)
 
             # 修改后的md写入文件
