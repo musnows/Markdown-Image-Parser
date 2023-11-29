@@ -51,7 +51,7 @@ def handler_network_pics(url: str, file_path: str):
     return (img_file_path,file_name)
 
 
-def handler_local_pics(url: str, file_path: str):
+def handler_local_pics(url: str, file_path: str,md_file_path:str):
     """
     将本地图片也进行移动
 
@@ -59,7 +59,23 @@ def handler_local_pics(url: str, file_path: str):
     - 空字符串：处理失败
     - 非空字符串：(图片绝对路径，图片文件名)
     """
-    return ("","")
+    # 判断是否为绝对路径
+    file_abs_path = url
+    if not os.path.isabs(file_abs_path):
+        # 不是绝对路径，需要构造一个绝对路径出来
+        base_md_file_path = os.path.dirname(md_file_path)
+        file_abs_path = os.path.abspath(os.path.join(base_md_file_path,file_abs_path))
+    # 现在一定是绝对路径了
+    _log.info(f'[local] {url} 图片绝对路径处理后：{file_abs_path}')
+    if not os.path.exists(file_abs_path):
+        _log.error(f'[local] {url} 图片路径没有对应文件：{file_abs_path}')
+        return ("","")
+    # 根据策略，将文件cp到目标位置
+    file_name = os.path.basename(file_abs_path)
+    img_file_path = os.path.join(file_path, file_name)
+    Files.copy_file(file_abs_path,img_file_path)
+    _log.info(f'[local] {url} 图片拷贝：{img_file_path} | 文件名：{file_name}')
+    return (img_file_path,file_name)
 
 
 def genarte_path(md_file_path:str):
@@ -80,7 +96,7 @@ def handler_pics(md_file_path:str,url: str) ->tuple[str, str]:
     options = config.HANDLER_TARGET_OPTIONS
     img_file_base_path = genarte_path(md_file_path)
     if 'http' not in url and (options >= ConfigType.HandlerTarget.LOCAL_IMG_ONLY):
-        return handler_local_pics(url,img_file_base_path)
+        return handler_local_pics(url,img_file_base_path,md_file_path)
     # 是否只处理本地图片
     if (options != ConfigType.HandlerTarget.LOCAL_IMG_ONLY):
         if config.NET_IMG_DOWNLOAD_INTERVAL != 0:
@@ -96,6 +112,10 @@ if __name__ == '__main__':
     file = ""
     md_file_count = 0
     try:
+        if not os.path.exists(config.MD_FILES_DIR):
+            _log.critical(f"您没有在当前目录下创建 '{config.MD_FILES_DIR}' 文件夹！请创建该文件夹并将需要处理的md文件放入其中！")
+            os.abort()
+
         _log.info("[run] 开始处理md文件")
         # 获取MD_FILES_DIR路径下的所有文件列表
         files_list = Files.get_files_list(os.path.abspath(os.path.join('.', config.MD_FILES_DIR)))
@@ -147,11 +167,8 @@ if __name__ == '__main__':
                         if config.REPLACE_LINK_OPTIONS == ConfigType.ImgRelaceFileType.REl:
                             # 是相对路径，还需要一层转换
                             fix_img_file_path = new_img_file_path
-                            if config.HANDLER_OPTIONS == ConfigType.HandlerType.REL_DIR:
-                                new_img_file_path = RelDirList[file] + "/" + new_img_file_name
-                            else:
-                                _log.info(f"[run] {file} 相对路径计算，图片文件：{new_img_file_path}")
-                                new_img_file_path = os.path.relpath(new_img_file_path,os.path.dirname(file))
+                            _log.info(f"[run] {file} 相对路径计算，图片文件：{new_img_file_path}")
+                            new_img_file_path = os.path.relpath(new_img_file_path,os.path.dirname(file))
 
                             _log.info(f'[run] {file} 相对路径图片链接修改，图片绝对路径：{fix_img_file_path} | 相对路径：{new_img_file_path}')
                         # 修改md文件中的内容

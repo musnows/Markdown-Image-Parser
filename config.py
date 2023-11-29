@@ -22,7 +22,7 @@ HANDLER_OPTIONS = 2
 - 2：在每个包含md文件的文件夹下，创建一个目录用于存放资源文件，该目录名字可通过IMG_REL_DIR修改
 """
 
-HANDLER_TARGET_OPTIONS = 1
+HANDLER_TARGET_OPTIONS = 3
 """
 图片处理目标
 - 1：只处理网络图片

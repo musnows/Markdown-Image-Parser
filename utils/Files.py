@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 
 from . import ConfigType
 from .Time import get_time
@@ -30,9 +31,10 @@ def open_md_file(path: str, encode):
         md_content = f.read()
     return md_content
 
-def write_md_file(path: str,md_content, encode):
+
+def write_md_file(path: str, md_content, encode):
     """写入md文件"""
-    with open(path, encoding=encode,mode='w') as f:
+    with open(path, encoding=encode, mode='w') as f:
         f.write(md_content)
 
 
@@ -44,6 +46,14 @@ def write_img_file(md_file_path: str, img_data, rename_options: ConfigType.ImgRe
     :return 新的文件路径（根据
     """
     return
+
+
+def copy_file(source:str,target:str):
+    """拷贝文件"""
+    if source == target:
+        return
+    shutil.copy2(source, target)
+    _log.info(f"[file] copy file from '{source}' to '{target}'")
 
 def get_files_list(dir: str):
     """
@@ -59,16 +69,16 @@ def get_files_list(dir: str):
     return files_list
 
 
-def add_err_pic(file_name: str, img_url: str,err_info:str = "None"):
+def add_err_pic(file_name: str, img_url: str, err_info: str = "None"):
     """
     添加处理错误的图片
     :param file_name 对应的md文件
     :param img_url 图片url链接
     :param err_info 错误原因
     """
-    global ErrImgDict,ErrImgCount
+    global ErrImgDict, ErrImgCount
     if file_name not in ErrImgDict:
-        ErrImgDict[file_name] = []
+        ErrImgDict[file_name] = {}
     # 插入图片
     ErrImgDict[file_name][img_url] = err_info
     ErrImgCount += 1
