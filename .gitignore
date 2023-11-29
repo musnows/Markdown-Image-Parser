@@ -1,2 +1,11 @@
-*.json
+*err.json
+!files/readme.txt
 files/
+
+*.log
+*.log.*
+
+# python
+**__pycache__/
+.vscode/
+.idea/
