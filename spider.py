@@ -1,189 +1,223 @@
-import misaka
 import os
-import requests
-import json
-from bs4 import BeautifulSoup
-from datetime import datetime
-from zoneinfo import ZoneInfo # python 3.9+
 import time
-import traceback
+import requests
+
+# 自定义包
+import config
+from utils import Pic, Files, ConfigType
+from utils.Logger import _log
 
 ###########################################################################################
 
-# 以下你可以根据自己的需要进行修改
-IS_REPLACE_LINK = True
-"""是否修改md文件中的链接？"""
-DEFUALT_IMG_TYPE = '.png'
+RelDirList = {}
 """
-给无后缀的图片url新增文件扩展名
-（建议测试一下到底是什么类型的图片，一般都是png）
+相对路径创建时的文件夹列表
+如果某个文件不在这里面，则创建文件夹后，添加进去
 """
 
-def img_url_check(img_url:str):
+def handler_network_pics(url: str, file_path: str):
     """
-    你可以修改这个函数，比如只下载某一部分url中的图片。
-    返回值为True代表需要下载当前图片
-    """
-    return True
-
-
-###########################################################################################
-
-TARGET_DIR ='./files/img/'
-"""存放下载好的本地图片的目录"""
-MD_FILES_DIR = './files'
-"""存放md文件的文件夹 """
-err_img = {}
-"""保存错误的图片dict"""
-
-def open_json_file(path):
-    """打开json文件"""
-    with open(path, 'r', encoding='utf-8') as f:
-        tmp = json.load(f)
-    return tmp
-
-def write_json_file(path: str, value):
-    """写入json文件"""
-    with open(path, 'w', encoding='utf-8') as fw2:
-        json.dump(value, fw2, indent=2, sort_keys=True, ensure_ascii=False)
-
-def get_time(format_str='%y-%m-%d-%H%M%S'):
-    """获取当前时间，格式为 `23-01-01-000000`"""
-    a = datetime.now(ZoneInfo('Asia/Shanghai'))  # 返回北京时间
-    return a.strftime(format_str)
-
-def write_err_file():
-    """写入日志文件"""
-    ERR_FILE_PATH = f"{get_time()}-err.json"
-    """保存错误图片的路径"""
-
-    print(f"\n[file] err_img\n{err_img}") # 保存之前打印，避免保存失败
-    write_json_file(ERR_FILE_PATH,err_img) # 写入文件
-    print(f"[file] write file | {ERR_FILE_PATH}") # 写入成功
-
-
-def get_files_list(dir):
-    """
-    获取一个目录下所有文件列表，包括子目录
-    :param dir: 文件路径
-    :return: 文件列表
-    """
-    files_list = []
-    for root, dirs, files in os.walk(dir, topdown=False):
-        for file in files:
-            files_list.append(os.path.join(root, file))
-
-    return files_list
-
-
-def get_pics_list(md_content):
-    """
-    获取一个markdown文档里的所有图片链接
-    :param md_content: open的md文件
-    :return: 图片列表
-    """
-    md_render = misaka.Markdown(misaka.HtmlRenderer())
-    html = md_render(md_content)
-    soup = BeautifulSoup(html, features='html.parser')
-    pics_list = []
-    for img in soup.find_all('img'):
-        pics_list.append(img.get('src'))
-
-    return pics_list
-
-
-def download_pics(url:str):
-    """
-    下载图片并保存到本地
+    下载网络图片并保存到本地
 
     Returns:
-    - 空字符串：非网络图片，处理失败
-    - 非空字符串：图片本地文件名
+    - 空字符串：处理失败
+    - 非空字符串：(图片绝对路径，图片文件名)
     """
     if 'http' not in url:
-        print('不处理本地图片: ', url)
-        return ""
-    if not img_url_check(url):
-        print('用户自定义图片url检查失败：',url)
-        return ""
+        _log.warning(f'[download] 不处理非http网络图片: {url}')
+        return ("","")
+    if not config.custom_net_img_url_check(url):
+        _log.warning(f'[download] 用户自定义图片url检查失败：{url}')
+        return ("","")
 
-    img_data = requests.get(url).content # 获取到的图片url文件data
-    filename = url[url.rfind('/')+1:] # 图片源文件名
-    # 如果filename中不包含.认为其没有文件后缀，给他添加上一个
-    if '.' not in filename:
-        filename += DEFUALT_IMG_TYPE
+    img_data = requests.get(url).content  # 获取到的图片url文件data
+    file_name = os.path.basename(url)  # 图片源文件名
+    # 如果filename中不包含.认为其没有文件后缀
+    # 给他添加上一个默认的图片文件后缀（否则无法识别为图片）
+    if '.' not in file_name:
+        file_md5 = Pic.calculate_md5_from_bytes(img_data)
+        file_name = file_md5 + config.DEFUALT_IMG_TYPE
+        _log.warning(f"[download] {url} 图片不存在扩展名，使用md5并添加扩展名：{file_name}")
+    if config.IMG_RENAME_OPTIONS == ConfigType.ImgRenameType.MD5:
+        file_md5 = Pic.calculate_md5_from_bytes(img_data)
+        file_extension = os.path.splitext(file_name)[1] # 图片扩展名
+        file_name = file_md5 + file_extension
 
-    print('图片文件名：',filename)
-
-    # 保存本地，用图片文件名命名
-    # 原作者用的是uuid随机命名，其实这样更好，但是：前提得替换md文件中的图片链接
-    # 可原作者并没有写这部分的代码，本人对本项目用到的模块并不了解，所以没有进行此功能开发
-    with open(os.path.join(TARGET_DIR, filename), 'w+') as f:
+    _log.info(f'[downlaod] {url} 处理后图片文件名：{file_name}')
+    # 保存本地
+    img_file_path = os.path.join(file_path, file_name)
+    with open(img_file_path, 'w+') as f:
         f.buffer.write(img_data)
-    return filename
+    return (img_file_path,file_name)
+
+
+FindFileList = []
+"""如果配置了本地路径查询，则会初始化这个变量"""
+
+def handler_local_pics(url: str, file_path: str,md_file_path:str):
+    """
+    将本地图片也进行移动
+
+    Returns:
+    - 空字符串：处理失败
+    - 非空字符串：(图片绝对路径，图片文件名)
+    """
+    # 判断是否为绝对路径
+    file_abs_path = url
+    if not os.path.isabs(file_abs_path):
+        # 不是绝对路径，需要构造一个绝对路径出来
+        base_md_file_path = os.path.dirname(md_file_path)
+        file_abs_path = os.path.abspath(os.path.join(base_md_file_path,file_abs_path))
+    # 现在一定是绝对路径了
+    file_name = os.path.basename(file_abs_path)
+    _log.info(f'[local] {url} 图片绝对路径：{file_abs_path} | 文件名：{file_name}')
+    if not os.path.exists(file_abs_path):
+        _log.error(f'[local] {url} 图片路径没有对应文件：{file_abs_path}')
+        if config.LOCAL_IMG_FIND_PATH != "":
+            global FindFileList
+            if not FindFileList:
+                FindFileList = Files.get_files_list(config.LOCAL_IMG_FIND_PATH)
+            # 开始查文件
+            target_file_is_find = False
+            for file in FindFileList:
+                if file_name in os.path.basename(file):
+                    file_abs_path = file
+                    target_file_is_find = True
+                    _log.info(f'[local] {url} 已在 {config.LOCAL_IMG_FIND_PATH} 中找到了文件 {target_file_is_find}')
+                    break
+
+            if not target_file_is_find:
+                _log.error(f'[local] {url} 未在 {config.LOCAL_IMG_FIND_PATH} 中找到')
+                return ("","")
+        else:
+            return ("","")
+
+    # 根据策略，将文件cp到目标位置
+    img_file_path = os.path.join(file_path, file_name)
+    Files.copy_file(file_abs_path,img_file_path)
+    _log.info(f'[local] {url} 图片拷贝：{img_file_path} | 文件名：{file_name}')
+    return (img_file_path,file_name)
+
+
+def genarte_path(md_file_path:str):
+    """根据配置的策略，创建一个文件的基础path(绝对路径)"""
+    # 固定文件路径，直接返回设置好的文件路径
+    if config.HANDLER_OPTIONS == ConfigType.HandlerType.FIX_DIR:
+        return os.path.abspath(config.IMG_FIX_DIR)
+
+    # 相对文件路径
+    global RelDirList
+    return RelDirList[md_file_path]
+
+
+def handler_pics(md_file_path:str,url: str) ->tuple[str, str]:
+    """图片处理函数，所有不带http的图片都认为是本地图片
+    :return (图片绝对路径，图片文件名)
+    """
+    options = config.HANDLER_TARGET_OPTIONS
+    img_file_base_path = genarte_path(md_file_path)
+    if 'http' not in url and (options >= ConfigType.HandlerTarget.LOCAL_IMG_ONLY):
+        return handler_local_pics(url,img_file_base_path,md_file_path)
+    # 是否只处理本地图片
+    if (options != ConfigType.HandlerTarget.LOCAL_IMG_ONLY):
+        if config.NET_IMG_DOWNLOAD_INTERVAL != 0:
+            time.sleep(config.NET_IMG_DOWNLOAD_INTERVAL)  # 避免网络图片下载超速
+        return handler_network_pics(url,img_file_base_path)
+
+
+#############################################################################################
 
 
 
 if __name__ == '__main__':
+    file = ""
+    md_file_count = 0
     try:
-        print("开始处理\n")
+        if not os.path.exists(config.MD_FILES_DIR):
+            _log.critical(f"您没有在当前目录下创建 '{config.MD_FILES_DIR}' 文件夹！请创建该文件夹并将需要处理的md文件放入其中！")
+            os.abort()
+
+        _log.info("[run] 开始处理md文件")
         # 获取MD_FILES_DIR路径下的所有文件列表
-        files_list = get_files_list(os.path.abspath(os.path.join('.', MD_FILES_DIR)))
-        # 如果目标文件目录不存在，创建文件目录
-        if not os.path.exists(TARGET_DIR):
-            os.mkdir(TARGET_DIR)
+        files_list = Files.get_files_list(os.path.abspath(os.path.join('.', config.MD_FILES_DIR)))
+        # 判断当前使用的是否为fix策略
+        if config.HANDLER_OPTIONS == ConfigType.HandlerType.FIX_DIR:
+            Files.create_dir(config.IMG_FIX_DIR)
+            _log.info(f"[run] 已创建 IMG_FIX_DIR | {config.IMG_FIX_DIR}")
 
         md_content = ""
         for file in files_list:
             if '.md' not in file:
-                print(f"不处理非md文件: {file}")
+                _log.warning(f"[run] 不处理非md后缀文件: {file}")
                 continue
+            # 判断是否采用相对路径图片存放策略，如果是，需要创建dir
+            if config.HANDLER_OPTIONS == ConfigType.HandlerType.REL_DIR:
+                cur_dir = os.path.dirname(file)
+                dir_sep = "/" if "\\" not in file else "\\" # 文件路径分隔符
+                new_rel_dir = cur_dir + dir_sep + config.IMG_REL_DIR
+                Files.create_dir(new_rel_dir) # 创建文件夹
+                RelDirList[file] = new_rel_dir # 插入进去
+                _log.info(f"[run] 已创建 IMG_REL_DIR | {new_rel_dir}")
 
-            print(f'正在处理md文件：{file}')
-            # utf-8会有编码报错。所以使用如下编码读取md文件
-            with open(file, encoding='ISO-8859-1') as f:
-                md_content = f.read()
+            # 开始处理当前md文件
+            _log.info(f'[run] {file} 文件开始处理')
+            md_file_count += 1
+            # 打开md文件
+            md_content = Files.open_md_file(file, config.MD_ENCODING_OPTIONS)
             # 获取图片列表
-            pics_list = get_pics_list(md_content)
-            print(f'发现图片 {len(pics_list)} 张')
+            pics_list = Pic.get_pics_list_from_md_html(md_content)
+            _log.info(f'[run] {file} 文件中发现图片 {len(pics_list)} 张')
 
-            md_file_name = "" # 初始化为空
+            # 开始处理图片
+            md_file_name = ""  # 初始化为空
             for index, pic in enumerate(pics_list):
                 try:
-                    print(f'正在下载第 {index + 1} 张图片...\n图片链接：', pic)
-                    md_file_name = os.path.basename(file) # 当前处理的md文件的名字
-                    # 处理图片
-                    new_img_file_name = download_pics(pic)
-                    # 修改md文件内容
-                    if IS_REPLACE_LINK and new_img_file_name != "":
-                        new_img_file_path = os.path.abspath(os.path.join('.',TARGET_DIR,new_img_file_name))
-                        new_img_file_path = new_img_file_path.replace('\\','/') # 路径转linux风格
-                        md_content = md_content.replace(pic,new_img_file_path)
+                    _log.info(f'[run] {file} 正在处理第 {index + 1} 张图片，图片链接：{pic}')
+                    md_file_name = os.path.basename(file)  # 当前处理的md文件的名字
+                    # 处理图片，包括下载或者将图片移动到本地
+                    new_img_file_path,new_img_file_name = handler_pics(file,pic)
+                    if new_img_file_name == "" or new_img_file_path == "":
+                        Files.add_err_pic(file, pic,"图片处理失败")  # 添加错误图片
+                        _log.error(f'[run] {file} 图片处理出错，返回值为空，图片链接：{pic}')
+                        continue
+                    # 不为空说明处理成功
+                    _log.info(f'[run] {file} 图片处理成功！图片原始链接：{pic} | 处理后：{new_img_file_name} | 文件位置：{new_img_file_path}')
+                    # 如果需要，修改md文件内容
+                    if config.IS_REPLACE_LINK and new_img_file_name != "":
+                        # 是什么方式的修改？相对路径还是绝对路径？
+                        if config.REPLACE_LINK_OPTIONS == ConfigType.ImgRelaceFileType.REl:
+                            # 是相对路径，还需要一层转换
+                            fix_img_file_path = new_img_file_path
+                            _log.info(f"[run] {file} 相对路径计算，图片文件：{new_img_file_path}")
+                            new_img_file_path = os.path.relpath(new_img_file_path,os.path.dirname(file))
 
-                    time.sleep(0.3) # 避免下载超速
+                            _log.info(f'[run] {file} 相对路径图片链接修改，图片绝对路径：{fix_img_file_path} | 相对路径：{new_img_file_path}')
+                        # 修改md文件中的内容
+                        new_img_file_path = new_img_file_path.replace('\\', '/')  # 路径转linux风格
+                        md_content = md_content.replace(pic, new_img_file_path)
+                        _log.info(f'[run] {file} 修改md文件，图片原始链接：{pic} | 修改后：{new_img_file_path}')
+
                 except KeyboardInterrupt:
-                    write_err_file() # 写入日志文件
-                    os.abort() # 避免无法ctrl+c
+                    Files.write_err_img_log_file()
+                    _log.critical(f"[run] 收到键盘中断信号，程序停止\n终止时正在处理：{file}\n")
+                    os.abort()  # 避免无法ctrl+c终止
                 except Exception as result:
-                    print(traceback.format_exc()) # 打印错误
-                    # 判断err_img，如果文件名不在里面，则新增键值
-                    if md_file_name not in err_img:
-                        err_img[md_file_name]=[]
-                    # 添加err图片
-                    err_img[md_file_name].append(pic)
-                    print("图片获取错误：",pic)
-                    time.sleep(1)
+                    _log.exception(f"[run] {file} 出现未知处理错误！pic:{pic}")
+                    Files.add_err_pic(file, pic,f"图片处理出现异常 {str(result)}")  # 添加错误图片
+                    time.sleep(0.6)
 
             # 修改后的md写入文件
-            with open(file, encoding='ISO-8859-1',mode='w') as f:
-                f.write(md_content)
+            if config.IS_REPLACE_LINK:
+                Files.write_md_file(file, md_content, config.MD_ENCODING_OPTIONS)
+                _log.info(f'[run] {file} 重新写入文件')
             # 处理完毕单个文件
-            print(f'处理完毕md文件：{file}\n')
+            _log.info(f'[run] {file} 文件结束处理')
 
         # 结束后保存err
-        print('\n全部处理完成。')
-        write_err_file()
+        _log.info(f'[run] 全部md处理完成，共计：{md_file_count}个')
+        Files.write_err_img_log_file()
     except Exception as result:
-        print(traceback.format_exc())
-        print("\n错误图片输出：\n",err_img)
+        _log.exception(f"[run] 出现未知处理错误！count:{md_file_count} | file:{file}")
+        Files.write_err_img_log_file()
+        _log.critical(f"[run] 出现未知处理错误，abort!\n")
         os.abort()
