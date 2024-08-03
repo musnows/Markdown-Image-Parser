@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+from urllib.parse import urlparse
 
 # 自定义包
 import config
@@ -30,8 +31,12 @@ def handler_network_pics(url: str, file_path: str):
         _log.warning(f'[download] 用户自定义图片url检查失败：{url}')
         return ("","")
 
-    img_data = requests.get(url).content  # 获取到的图片url文件data
-    file_name = os.path.basename(url)  # 图片源文件名
+    # 去除URL中的查询参数
+    parsed_url = urlparse(url)
+    url_without_query = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
+
+    img_data = requests.get(url_without_query).content  # 获取到的图片url文件data
+    file_name = os.path.basename(parsed_url.path)  # 图片源文件名
     # 如果filename中不包含.认为其没有文件后缀
     # 给他添加上一个默认的图片文件后缀（否则无法识别为图片）
     if '.' not in file_name:
@@ -43,12 +48,12 @@ def handler_network_pics(url: str, file_path: str):
         file_extension = os.path.splitext(file_name)[1] # 图片扩展名
         file_name = file_md5 + file_extension
 
-    _log.info(f'[downlaod] {url} 处理后图片文件名：{file_name}')
+    _log.info(f'[download] {url} 处理后图片文件名：{file_name}')
     # 保存本地
     img_file_path = os.path.join(file_path, file_name)
-    with open(img_file_path, 'w+') as f:
-        f.buffer.write(img_data)
-    return (img_file_path,file_name)
+    with open(img_file_path, 'wb') as f:
+        f.write(img_data)
+    return (img_file_path, file_name)
 
 
 FindFileList = []
@@ -114,6 +119,11 @@ def handler_pics(md_file_path:str,url: str) ->tuple[str, str]:
     """图片处理函数，所有不带http的图片都认为是本地图片
     :return (图片绝对路径，图片文件名)
     """
+
+    # 新增逻辑：处理没有 http 的 juejin 图片
+    if 'juejin' in url and 'http' not in url:
+        url = 'https:' + url
+
     options = config.HANDLER_TARGET_OPTIONS
     img_file_base_path = genarte_path(md_file_path)
     if 'http' not in url and (options >= ConfigType.HandlerTarget.LOCAL_IMG_ONLY):
